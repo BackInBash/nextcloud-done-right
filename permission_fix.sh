@@ -1,0 +1,1 @@
+docker-compose exec app chown -R 82:root /var/www/html
