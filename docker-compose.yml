@@ -33,7 +33,7 @@ services:
       - nextcloud:/var/www/html
     entrypoint: /cron.sh
     depends_on:
-      - db
+      - tidb
       - redis
 
   web:
@@ -163,7 +163,7 @@ services:
   tidb:
     image: pingcap/tidb:latest
     ports:
-      - "3306:4000"
+      - "3306:3306"
       - "10080:10080"
     volumes:
       - ./tidb-docker-compose/config/tidb.toml:/tidb.toml:ro
