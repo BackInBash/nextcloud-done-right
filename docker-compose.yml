@@ -1,4 +1,4 @@
-version: '2.1'
+version: '3'
 
 volumes:
   nextcloud:
@@ -10,6 +10,18 @@ services:
     image: redis:alpine
     restart: always
 
+  db:
+    image: mariadb
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-file-per-table=1 --skip-innodb-read-only-compressed
+    restart: always
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=nextcloud
+      - MYSQL_PASSWORD=
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+
   app:
     image: nextcloud:fpm-alpine
     restart: always
@@ -17,13 +29,14 @@ services:
     volumes:
       - nextcloud:/var/www/html
     environment:
-      - MYSQL_HOST=tidb
+      - MYSQL_HOST=db
       - REDIS_HOST=redis
-      - MYSQL_PASSWORD=
+      - MYSQL_PASSWORD=nextcloud
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=root
+      - PHP_MEMORY_LIMIT=2048M
     depends_on:
-      - tidb
+      - db
       - redis
 
   cron:
@@ -33,7 +46,7 @@ services:
       - nextcloud:/var/www/html
     entrypoint: /cron.sh
     depends_on:
-      - tidb
+      - db
       - redis
 
   web:
@@ -47,211 +60,3 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     volumes_from:
       - app
-  
-  pd0:
-    image: pingcap/pd:latest
-    ports:
-      - "2379"
-    volumes:
-      - ./tidb-docker-compose/config/pd.toml:/pd.toml:ro
-      - ./data:/data
-      - ./logs:/logs
-    command:
-      - --name=pd0
-      - --client-urls=http://0.0.0.0:2379
-      - --peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://pd0:2379
-      - --advertise-peer-urls=http://pd0:2380
-      - --initial-cluster=pd0=http://pd0:2380,pd1=http://pd1:2380,pd2=http://pd2:2380
-      - --data-dir=/data/pd0
-      - --config=/pd.toml
-      - --log-file=/logs/pd0.log
-    restart: on-failure
-  pd1:
-    image: pingcap/pd:latest
-    ports:
-      - "2379"
-    volumes:
-      - ./tidb-docker-compose/config/pd.toml:/pd.toml:ro
-      - ./data:/data
-      - ./logs:/logs
-    command:
-      - --name=pd1
-      - --client-urls=http://0.0.0.0:2379
-      - --peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://pd1:2379
-      - --advertise-peer-urls=http://pd1:2380
-      - --initial-cluster=pd0=http://pd0:2380,pd1=http://pd1:2380,pd2=http://pd2:2380
-      - --data-dir=/data/pd1
-      - --config=/pd.toml
-      - --log-file=/logs/pd1.log
-    restart: on-failure
-  pd2:
-    image: pingcap/pd:latest
-    ports:
-      - "2379"
-    volumes:
-      - ./tidb-docker-compose/config/pd.toml:/pd.toml:ro
-      - ./data:/data
-      - ./logs:/logs
-    command:
-      - --name=pd2
-      - --client-urls=http://0.0.0.0:2379
-      - --peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://pd2:2379
-      - --advertise-peer-urls=http://pd2:2380
-      - --initial-cluster=pd0=http://pd0:2380,pd1=http://pd1:2380,pd2=http://pd2:2380
-      - --data-dir=/data/pd2
-      - --config=/pd.toml
-      - --log-file=/logs/pd2.log
-    restart: on-failure
-  tikv0:
-    image: pingcap/tikv:latest
-    volumes:
-      - ./tidb-docker-compose/config/tikv.toml:/tikv.toml:ro
-      - ./data:/data
-      - ./logs:/logs
-    command:
-      - --addr=0.0.0.0:20160
-      - --advertise-addr=tikv0:20160
-      - --data-dir=/data/tikv0
-      - --pd=pd0:2379,pd1:2379,pd2:2379
-      - --config=/tikv.toml
-      - --log-file=/logs/tikv0.log
-    depends_on:
-      - "pd0"
-      - "pd1"
-      - "pd2"
-    restart: on-failure
-  tikv1:
-    image: pingcap/tikv:latest
-    volumes:
-      - ./tidb-docker-compose/config/tikv.toml:/tikv.toml:ro
-      - ./data:/data
-      - ./logs:/logs
-    command:
-      - --addr=0.0.0.0:20160
-      - --advertise-addr=tikv1:20160
-      - --data-dir=/data/tikv1
-      - --pd=pd0:2379,pd1:2379,pd2:2379
-      - --config=/tikv.toml
-      - --log-file=/logs/tikv1.log
-    depends_on:
-      - "pd0"
-      - "pd1"
-      - "pd2"
-    restart: on-failure
-  tikv2:
-    image: pingcap/tikv:latest
-    volumes:
-      - ./tidb-docker-compose/config/tikv.toml:/tikv.toml:ro
-      - ./data:/data
-      - ./logs:/logs
-    command:
-      - --addr=0.0.0.0:20160
-      - --advertise-addr=tikv2:20160
-      - --data-dir=/data/tikv2
-      - --pd=pd0:2379,pd1:2379,pd2:2379
-      - --config=/tikv.toml
-      - --log-file=/logs/tikv2.log
-    depends_on:
-      - "pd0"
-      - "pd1"
-      - "pd2"
-    restart: on-failure
-
-  tidb:
-    image: pingcap/tidb:latest
-    ports:
-      - "3306:3306"
-      - "10080:10080"
-    volumes:
-      - ./tidb-docker-compose/config/tidb.toml:/tidb.toml:ro
-      - ./logs:/logs
-    command:
-      - --store=tikv
-      - --path=pd0:2379,pd1:2379,pd2:2379
-      - --config=/tidb.toml
-      - --log-file=/logs/tidb.log
-      - --advertise-address=tidb
-    depends_on:
-      - "tikv0"
-      - "tikv1"
-      - "tikv2"
-    restart: on-failure
-  tispark-master:
-    image: pingcap/tispark:v2.1.1
-    command:
-      - /opt/spark/sbin/start-master.sh
-    volumes:
-      - ./tidb-docker-compose/config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
-    environment:
-      SPARK_MASTER_PORT: 7077
-      SPARK_MASTER_WEBUI_PORT: 8080
-    ports:
-      - "7077:7077"
-      - "8080:8080"
-    depends_on:
-      - "tikv0"
-      - "tikv1"
-      - "tikv2"
-    restart: on-failure
-  tispark-slave0:
-    image: pingcap/tispark:v2.1.1
-    command:
-      - /opt/spark/sbin/start-slave.sh
-      - spark://tispark-master:7077
-    volumes:
-      - ./tidb-docker-compose/config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
-    environment:
-      SPARK_WORKER_WEBUI_PORT: 38081
-    ports:
-      - "38081:38081"
-    depends_on:
-      - tispark-master
-    restart: on-failure
-
-  tidb-vision:
-    image: pingcap/tidb-vision:latest
-    environment:
-      PD_ENDPOINT: pd0:2379
-    ports:
-      - "8010:8010"
-    restart: on-failure
-
-  # monitors
-  pushgateway:
-    image: prom/pushgateway:v0.3.1
-    command:
-      - --log.level=error
-    restart: on-failure
-  prometheus:
-    user: root
-    image: prom/prometheus:v2.2.1
-    command:
-      - --log.level=error
-      - --storage.tsdb.path=/data/prometheus
-      - --config.file=/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./tidb-docker-compose/config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./tidb-docker-compose/config/pd.rules.yml:/etc/prometheus/pd.rules.yml:ro
-      - ./tidb-docker-compose/config/tikv.rules.yml:/etc/prometheus/tikv.rules.yml:ro
-      - ./tidb-docker-compose/config/tidb.rules.yml:/etc/prometheus/tidb.rules.yml:ro
-      - ./data:/data
-    restart: on-failure
-  grafana:
-    image: grafana/grafana:6.0.1
-    user: "0"
-    environment:
-      GF_LOG_LEVEL: error
-      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
-      GF_PATHS_CONFIG: /etc/grafana/grafana.ini
-    volumes:
-      - ./tidb-docker-compose/config/grafana:/etc/grafana
-      - ./tidb-docker-compose/config/dashboards:/tmp/dashboards
-      - ./data/grafana:/var/lib/grafana
-    ports:
-      - "3000:3000"
-    restart: on-failure
