@@ -8,5 +8,10 @@ The default **Baseline** for all tests is a Dockerized Nextcloud Deployment with
 + default | Normal Nextcloud Deployment on MariaDB
 + worker-scale | Nextcloud on MariaDB with 3 PHP Worker load balanced by nginx
 
+## Architecture
+![](arch.png)
+
 ## Performance
+Comparison between the Default setup with one PHP worker an the setup with three PHP workers.
+
 ![](default.png)
