@@ -1,6 +1,8 @@
 # Nextcloud Done Right
 Scaling Options for Netxtcloud.
 
+__Blogpost__: [brunsch.me/scale-nextcloud](https://www.brunsch.me/scale-nextcloud) (in German)
+
 The default **Baseline** for all tests is a Dockerized Nextcloud Deployment with an Nginx Reverse Proxy, MariaDB Database, Redis Cache and a Nextcloud FPM Worker an a dedicated CronJob Container. The PHP Memorylimit is set to `2048M`.
 
 ## Branches
